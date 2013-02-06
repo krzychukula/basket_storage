@@ -21,6 +21,8 @@ var Progress = (function(){
             self.removed = true;
 
             if(self.callback){
+                console.timeEnd('stop');
+                console.timeStamp('callback');
                 self.callback();
             }
         }, 100);
@@ -35,10 +37,10 @@ var Progress = (function(){
             this.val += plus;
             console.log(this.val+"%");
         }
-        if(this.val > 100){
+        if(this.val >= 100){
             runApp.call(this);
         }else{
-            setTimeout(animateProgress.bind(this), 30);
+            setTimeout(animateProgress.bind(this), 1000/60);
         }
 
         this.prog.value = this.val;
@@ -54,6 +56,8 @@ var Progress = (function(){
     };
 
     Progress.prototype.stop = function(){
+        console.time('stop');
+        console.timeStamp('stop called');
         this.setProgress(100);
     };
 

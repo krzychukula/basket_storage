@@ -11,6 +11,7 @@
         var title = document.createElement('h1');
         title.innerText = 'Witaj!';
         document.body.appendChild(title);
+        console.timeStamp('app started');
     };
 
     window.App = App;

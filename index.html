@@ -10,22 +10,19 @@
 
 <script type="text/javascript" src="rsvp.js"></script>
 <script type="text/javascript" src="basket.js"></script>
-<script type="text/javascript" src="progress.js"></script>
 <script type="text/javascript">
 
-var prog = new Progress(function(){
-    //init application
-    var app = new App();
-    app.start();
-});
-prog.start();
-
-
 basket.require({
-    url: 'jqueryBIG.js'
+    url: 'progress.js'
 }).then(function(){
-
+    var prog = new Progress(function(){
+        //init application
+        var app = new App();
+        app.start();
+    });
     prog.setProgress(25);
+    prog.start();
+
 
     basket.require({
         url: 'jquery-1.9.1.js'
@@ -45,12 +42,21 @@ basket.require({
 
                 prog.stop();
 
+                Zepto(document.body).tap(function(){
+                    basket.clear();
+                })
+                jQuery(document.body).click(function(){
+                    basket.clear();
+                })
+
             });
 
         });
 
     });
 });
+
+
 
 
 
