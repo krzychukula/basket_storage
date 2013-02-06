@@ -9,7 +9,7 @@ var Progress = (function(){
         this.prog = document.getElementById('init-prog');
     }
 
-    var runApp = function(){
+    var endAnimation = function(){
 
         var self = this;
         this.prog.value = this.val = 100;
@@ -38,7 +38,7 @@ var Progress = (function(){
             console.log(this.val+"%");
         }
         if(this.val >= 100){
-            runApp.call(this);
+            endAnimation.call(this);
         }else{
             setTimeout(animateProgress.bind(this), 1000/60);
         }
@@ -52,12 +52,14 @@ var Progress = (function(){
 
     Progress.prototype.setProgress = function(value) {
         console.log('Set progress from: ', this.val, ' to: ', value);
+
         this.targetVal = value;
     };
 
     Progress.prototype.stop = function(){
         console.time('stop');
-        console.timeStamp('stop called');
+        console.log('stop called');
+
         this.setProgress(100);
     };
 

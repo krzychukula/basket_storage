@@ -8,10 +8,11 @@
 
     App.prototype.start = function () {
         console.log("Start!");
+
         var title = document.createElement('h1');
-        title.innerText = 'Witaj!';
+        title.innerText = 'Hello World!';
         document.body.appendChild(title);
-        console.timeStamp('app started');
+
     };
 
     window.App = App;
