@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+    <title>Offline Page Scripts</title>
+    <link rel="stylesheet" type="text/css" href="style.css"/>
+</head>
+<body>
+
+<progress id="init-prog" value="0" max="100">0%</progress>
+
+<script type="text/javascript" src="rsvp.js"></script>
+<script type="text/javascript" src="basket.js"></script>
+<script type="text/javascript" src="progress.js"></script>
+<script type="text/javascript">
+
+var prog = new Progress(function(){
+    //init application
+    var app = new App();
+    app.start();
+});
+prog.start();
+
+
+basket.require({
+    url: 'jqueryBIG.js'
+}).then(function(){
+
+    prog.setProgress(25);
+
+    basket.require({
+        url: 'jquery-1.9.1.js'
+    }).then(function(){
+
+        prog.setProgress(50);
+
+        basket.require({
+            url: 'zepto.js'
+        }).then(function(){
+
+            prog.setProgress(75);
+
+            basket.require({
+                url: 'app.js'
+            }).then(function(){
+
+                prog.stop();
+
+            });
+
+        });
+
+    });
+});
+
+
+
+</script>
+</body>
+</html>
