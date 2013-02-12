@@ -40,10 +40,10 @@
         },{
             url: 'progress.js'
         }],[{
-            url: 'jquery-1.9.1.js'
-        }],[{
             url: 'zepto.js'
         }],[{
+            url: 'downloader.js'
+        },{
             url: 'app.js'
         }]
         ], progressCallback);
