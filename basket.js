@@ -1,206 +1,202 @@
-/*!
-* basket.js
-* v0.3.0 - 2012-12-28
-* http://addyosmani.github.com/basket.js
-* (c) Addy Osmani; MIT License
-* Created by: Addy Osmani, Sindre Sorhus, Andrée Hansson
-* Contributors: Ironsjp, Mathias Bynens, Rick Waldron, Felipe Morais
-* Uses rsvp.js, https://github.com/tildeio/rsvp.js
+/*global document, XMLHttpRequest, localStorage, basket, RSVP*/
+
+/* https://raw.github.com/amrnt/basket.js/565f1f3c9e2870bf53ed5f9c0962dd9b8571251f/lib/basket.js
+* With support for loading CSS files
 */
 
 (function( window, document ) {
-	'use strict';
+    'use strict';
 
-	// Monkey-patching an "all" method onto RSVP
-	// Returns a promise that will be fulfilled when the array of promises passed in are all
-	// fulfilled
-	RSVP.all = function( promises ) {
-		var i, results = [];
-		var allPromise = new RSVP.Promise();
-		var remaining = promises.length;
+    var head = document.head || document.getElementsByTagName('head')[0];
+    var storagePrefix = 'basket-';
+    var defaultExpiration = 5000;
 
-		var resolver = function( index ) {
-			return function( value ) {
-				resolve( index, value );
-			};
-		};
-		var resolve = function( index, value ) {
-			results[ index ] = value;
-			if ( --remaining === 0 ) {
-				allPromise.resolve( results );
-			}
-		};
-		var reject = function( error ) {
-			allPromise.reject( error );
-		};
+    var addLocalStorage = function( key, storeObj ) {
+        try {
+            localStorage.setItem( storagePrefix + key, JSON.stringify( storeObj ) );
+            return true;
+        } catch( e ) {
+            if ( e.name.toUpperCase().indexOf('QUOTA') >= 0 ) {
+                var item;
+                var tempScripts = [];
 
-		for ( i = 0; i < remaining; i++ ) {
-			promises[ i ].then( resolver( i ), reject );
-		}
+                for ( item in localStorage ) {
+                    if ( item.indexOf( storagePrefix ) === 0 ) {
+                        tempScripts.push( JSON.parse( localStorage[ item ] ) );
+                    }
+                }
 
-		return allPromise;
-	};
+                if ( tempScripts.length ) {
+                    tempScripts.sort(function( a, b ) {
+                        return a.stamp - b.stamp;
+                    });
 
-	var head = document.head || document.getElementsByTagName('head')[0];
-	var storagePrefix = 'basket-';
-	var defaultExpiration = 5000;
+                    basket.remove( tempScripts[ 0 ].key );
 
-	var addLocalStorage = function( key, storeObj ) {
-		try {
-			localStorage.setItem( storagePrefix + key, JSON.stringify( storeObj ) );
-			return true;
-		} catch( e ) {
-			if ( e.name.toUpperCase().indexOf('QUOTA') >= 0 ) {
-				var item;
-				var tempScripts = [];
+                    return addLocalStorage( key, storeObj );
 
-				for ( item in localStorage ) {
-					if ( item.indexOf( storagePrefix ) === 0 ) {
-						tempScripts.push( JSON.parse( localStorage[ item ] ) );
-					}
-				}
+                } else {
+                    // no files to remove. Larger than available quota
+                    return;
+                }
 
-				if ( tempScripts.length ) {
-					tempScripts.sort(function( a, b ) {
-						return a.stamp - b.stamp;
-					});
+            } else {
+                // some other error
+                return;
+            }
+        }
 
-					basket.remove( tempScripts[ 0 ].key );
+    };
 
-					return addLocalStorage( key, storeObj );
+    var getUrl = function( url ) {
+        var xhr = new XMLHttpRequest();
+        var promise = new RSVP.Promise();
+        xhr.open( 'GET', url );
 
-				} else {
-					// no files to remove. Larger than available quota
-					return;
-				}
+        xhr.onreadystatechange = function() {
+            if ( xhr.readyState === 4 ) {
+                if( xhr.status === 200 ) {
+                    promise.resolve( xhr );
+                } else {
+                    promise.reject( new Error( xhr.statusText ) );
+                }
+            }
+        };
 
-			} else {
-				// some other error
-				return;
-			}
-		}
+        xhr.send();
 
-	};
+        return promise;
+    };
 
-	var getUrl = function( url ) {
-		var xhr = new XMLHttpRequest();
-		var promise = new RSVP.Promise();
-		xhr.open( 'GET', url );
+    var saveUrl = function( obj ) {
+        return getUrl( obj.url ).then( function( text ) {
+            var storeObj = wrapStoreData( obj, text );
 
-		xhr.onreadystatechange = function() {
-			if ( xhr.readyState === 4 ) {
-				if( xhr.status === 200 ) {
-					promise.resolve( xhr.responseText );
-				} else {
-					promise.reject( new Error( xhr.statusText ) );
-				}
-			}
-		};
+            addLocalStorage( obj.key , storeObj );
 
-		xhr.send();
+            return storeObj;
+        });
+    };
 
-		return promise;
-	};
+    var addToDOM = function( source ) {
+        var text = source.data;
+        var isCSS = source.dataType.indexOf('css') !== -1;
 
-	var saveUrl = function( obj ) {
-		return getUrl( obj.url ).then( function( text ) {
-			var storeObj = wrapStoreData( obj, text );
+        var el = document.createElement( isCSS ? 'style' : 'script');
+        if ( isCSS ) {
+            el.setAttribute('type', 'text/css');
+            if (el.styleSheet){ // >= IE6
+                el.styleSheet.cssText = text;
+            } else { // Rest
+                el.appendChild(document.createTextNode(text));
+            }
+        } else {
+            el.defer = true;
+            // Have to use .text, since we support IE8,
+            // which won't allow appending to a script
+            el.text = text;
+        }
+        head.appendChild( el );
+    };
 
-			addLocalStorage( obj.key , storeObj );
+    var wrapStoreData = function( obj, data ) {
+        var now = +new Date();
+        obj.data = data.responseText;
+        obj.dataType = data.getResponseHeader('content-type');
+        obj.stamp = now;
+        obj.expire = now + ( ( obj.expire || defaultExpiration ) * 60 * 60 * 1000 );
 
-			return text;
-		});
-	};
+        return obj;
+    };
 
-	var injectScript = function( text ) {
-		var script = document.createElement('script');
-		script.defer = true;
-		// Have to use .text, since we support IE8,
-		// which won't allow appending to a script
-		script.text = text;
-		head.appendChild( script );
-	};
+    var isValidItem = function(source, obj) {
+        return (!source || source.expire - +new Date() < 0  || obj.unique !== source.unique || (basket.isValidItem && !basket.isValidItem(source, obj)));
+    };
 
-	var wrapStoreData = function( obj, data ) {
-		var now = +new Date();
-		obj.data = data;
-		obj.stamp = now;
-		obj.expire = now + ( ( obj.expire || defaultExpiration ) * 60 * 60 * 1000 );
+    var handleStackObject = function( obj ) {
+        var source, promise;
 
-		return obj;
-	};
+        if ( !obj.url ) {
+            return;
+        }
 
-	var handleStackObject = function( obj ) {
-		var source, promise;
+        obj.key =  ( obj.key || obj.url );
+        source = basket.get( obj.key );
 
-		if ( !obj.url ) {
-			return;
-		}
+        obj.execute = obj.execute !== false;
 
-		obj.key =  ( obj.key || obj.url );
-		source = basket.get( obj.key );
+        if (isValidItem(source, obj)) {
+            if ( obj.unique ) {
+                // set parameter to prevent browser cache
+                obj.url += ( ( obj.url.indexOf('?') > 0 ) ? '&' : '?' ) + 'basket-unique=' + obj.unique;
+            }
+            promise = saveUrl( obj );
+        } else {
+            promise = new RSVP.Promise();
+            promise.resolve( source );
+        }
 
-		obj.execute = obj.execute !== false;
+        if( obj.execute ) {
+            return promise.then( addToDOM );
+        } else {
+            return promise;
+        }
+    };
 
-		if ( !source || source.expire - +new Date() < 0  || obj.unique !== source.unique ) {
-			if ( obj.unique ) {
-				// set parameter to prevent browser cache
-				obj.url += ( ( obj.url.indexOf('?') > 0 ) ? '&' : '?' ) + 'basket-unique=' + obj.unique;
-			}
-			promise = saveUrl( obj );
-		} else {
-			promise = new RSVP.Promise();
-			promise.resolve( source.data );
-		}
+    var thenRequire = function() {
+        var args = arguments;
+        var promise = this.then( function() {
+            return basket.require.apply( basket, args );
+        });
+        promise.thenRequire = thenRequire;
+        return promise;
+    };
 
-		if( obj.execute ) {
-			return promise.then( injectScript );
-		} else {
-			return promise;
-		}
-	};
+    window.basket = {
+        require: function() {
+            var i, l, promises = [];
 
-	window.basket = {
-		require: function() {
-			var i, l, promises = [];
+            for ( i = 0, l = arguments.length; i < l; i++ ) {
+                promises.push( handleStackObject( arguments[ i ] ) );
+            }
 
-			for ( i = 0, l = arguments.length; i < l; i++ ) {
-				promises.push( handleStackObject( arguments[ i ] ) );
-			}
+            var all = RSVP.all( promises );
+            all.thenRequire = thenRequire;
+            return all;
+        },
 
-			return RSVP.all( promises );
-		},
+        remove: function( key ) {
+            localStorage.removeItem( storagePrefix + key );
+            return this;
+        },
 
-		remove: function( key ) {
-			localStorage.removeItem( storagePrefix + key );
-			return this;
-		},
+        get: function( key ) {
+            var item = localStorage.getItem( storagePrefix + key );
+            try {
+                return JSON.parse( item || 'false' );
+            } catch( e ) {
+                return false;
+            }
+        },
 
-		get: function( key ) {
-			var item = localStorage.getItem( storagePrefix + key );
-			try	{
-				return JSON.parse( item || 'false' );
-			} catch( e ) {
-				return false;
-			}
-		},
+        clear: function( expired ) {
+            var item, key;
+            var now = +new Date();
 
-		clear: function( expired ) {
-			var item, key;
-			var now = +new Date();
+            for ( item in localStorage ) {
+                key = item.split( storagePrefix )[ 1 ];
+                if ( key && ( !expired || this.get( key ).expire <= now ) ) {
+                    this.remove( key );
+                }
+            }
 
-			for ( item in localStorage ) {
-				key = item.split( storagePrefix )[ 1 ];
-				if ( key && ( !expired || this.get( key ).expire <= now ) ) {
-					this.remove( key );
-				}
-			}
+            return this;
+        },
 
-			return this;
-		}
-	};
+        isValidItem: null
+    };
 
-	// delete expired keys
-	basket.clear( true );
+    // delete expired keys
+    basket.clear( true );
 
 })( this, document );

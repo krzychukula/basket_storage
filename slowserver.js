@@ -11,5 +11,5 @@ httpProxy.createServer(function (req, res, proxy) {
       port: 8080,
       buffer: buffer
     });
-  }, 4000);
+  }, 2000);
 }).listen(8000);
